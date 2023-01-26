@@ -14,7 +14,7 @@ extern "C" {
 #define SCREEN4	0x08
 #define VS		0x10
 
-extern char rom_is_compressed;
+//extern char rom_is_compressed;
 extern char ewram_owner_is_sram;
 extern char sprite_vram_in_use;
 extern char do_not_decompress;
@@ -23,8 +23,8 @@ extern char do_not_reset_all;
 void redecompress(void);
 //static void read_rom_header(u8 *nesheader);
 //static int get_prg_bank_size(int mapper);
-void loadcart(int rom_number, int emu_flags, int called_from);
-void init_cache(u8* nes_header, int called_from);
+void loadcart(int rom_number, int emu_flags, int loading_state);
+void init_cache(u8* nes_header, int do_reset);
 void stop_dma_interrupts(void);
 void resume_interrupts(void);
 void swapmem (u32* A, u32*B, u32 Asize);

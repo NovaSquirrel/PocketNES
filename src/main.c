@@ -1,5 +1,8 @@
 #include "includes.h"
 
+#define POGO_FILEHEAD (*(u8**)0x0203fbfc)
+#define POGO_FILETAIL (*(u8**)0x0203fbf8)
+
 /*
 #include <stdio.h>
 #include <string.h>
@@ -22,6 +25,7 @@ EWRAM_BSS u32 max_multiboot_size;
 EWRAM_BSS u32 oldinput;
 
 EWRAM_BSS char pogoshell_romname[32];	//keep track of rom name (for state saving, etc)
+EWRAM_BSS u32 pogoshell_filesize;
 #if RTCSUPPORT
 EWRAM_BSS char rtc=0;
 #endif
@@ -41,8 +45,7 @@ EWRAM_BSS u32 copiedfromrom=0;
 
 int strstr_(const char *str1, const char *str2);
 
-__attribute__((section(".append")))
-int main()
+APPEND int main()
 {
 	//set text_start (before moving the rom)
 	extern u8 __rom_end__[];
@@ -59,8 +62,15 @@ int main()
 	if (end_addr < 0x08000000 && copiedfromrom)
 	{
 		textstart += (0x08000000 - 0x02000000);
-	}
 
+#if COMPY
+		//simulate full multiboot for debugging  (DELETE LATER)
+		memcpy32((u8*)end_addr, textstart, 0x02040000 - end_addr);
+		textstart = (u8*)end_addr;
+		copiedfromrom = 0;
+#endif	
+
+	}
 	C_entry();
 	return 0;
 }
@@ -68,8 +78,7 @@ int main()
 #endif
 
 
-__attribute__((section(".append")))
-void C_entry()
+APPEND void C_entry()
 {
 	int i;
 	u32 temp;
@@ -117,18 +126,32 @@ void C_entry()
 	*MEM_PALETTE=0;					//black background (avoids blue flash when doing multiboot)
 	REG_DISPCNT=0;					//screen ON, MODE0
 	
+	#if !COMPY
 	memset32((u32*)0x6000000,0,0x18000);  //clear vram (fixes graphics junk)
+	#endif
 	//Warning: VRAM code must be loaded at some point
 	
-	temp=(u32)(*(u8**)0x0203FBFC);
+	#if !COMPY
+	temp=(u32)POGO_FILEHEAD;
 	pogoshell=((temp & 0xFE000000) == 0x08000000)?1:0;
+	if (pogoshell)
+	{
+		u32 tail = (u32)POGO_FILETAIL;
+		pogoshell_filesize = tail - temp;
+	}
+	#else
+	pogoshell = 0;
+	pogoshell_filesize = 0;
+	#endif
 	gbaversion=CheckGBAVersion();
 	
 	//load font+palette
 	loadfont();
 	loadfontpal();
 	ui_x=0x100;
+#if ROMMENU
 	move_ui();
+#endif
 //	REG_BG2HOFS=0x0100;		//Screen left
 	REG_BG2CNT=0x0400;	//16color 512x256 CHRbase0 SCRbase6 Priority0
 	
@@ -149,10 +172,11 @@ void C_entry()
 	BUFFER3 = BUFFER2+0x20000;
 #endif
 
+#if !COMPY
 	if(pogoshell)
 	{
 		//find the filename
-		char *s=(char*)0x0203fc08;
+		volatile char *s=(volatile char*)0x0203fc08;
 		//0203FC08 contains argv[0], 00, then argv[1].
 		//advance past first null
 		while (*s++ != 0);
@@ -175,7 +199,7 @@ void C_entry()
 			emuflags &= ~PALTIMING;
 		
 		//set ROM address
-		textstart=(*(u8**)0x0203FBFC)-sizeof(romheader);
+		textstart=POGO_FILEHEAD-sizeof(romheader);
 		
 		//So it will try to detect roms when loading state
 		roms=1;
@@ -184,7 +208,9 @@ void C_entry()
 		memcpy(mb_header.name,pogoshell_romname,32);
 #endif
 	}
+#endif
 
+#if ROMMENU
 	if (!pogoshell)
 	{
 		bool wantToSplash = false;
@@ -235,6 +261,9 @@ void C_entry()
 		if(!i)i=1;					//Stop PocketNES from crashing if there are no ROMs
 		roms=i;
 	}
+#else
+	roms = 1;
+#endif
 //	REG_WININ=0xFFFF;
 //	REG_WINOUT=0xFFFB;
 //	REG_WIN0H=0xFF;
@@ -244,14 +273,6 @@ void C_entry()
 	extern u8 __vram1_start[], __vram1_lma[], __vram1_end[];
 	int vram1_size = ((((u8*)__vram1_end - (u8*)__vram1_start) - 1) | 3) + 1;
 	memcpy32((u32*)__vram1_start,(const u32*)__vram1_lma,vram1_size);
-	
-	//If multiboot, move ROM from textstart to heapstart
-	//u32 end_addr = (u32)(&__rom_end__);
-	if (copiedfromrom == 0 && (u32)textstart < 0x08000000 && textstart > ewram_start)
-	{
-		memmove32(ewram_start, textstart, 0x02040000 - (u32)textstart);
-		textstart = ewram_start;
-	}
 	
 	spriteinit();
 	stop_dma_interrupts();
@@ -292,8 +313,7 @@ void jump_to_rommenu()
 }
 
 //show splash screen
-__attribute__((section(".append")))
-void splash(const u16 *image) {
+APPEND void splash(const u16 *image) {
 	int i;
 
 	REG_DISPCNT=FORCE_BLANK;	//screen OFF
@@ -320,8 +340,7 @@ void splash(const u16 *image) {
 }
 
 #if COMPY
-__attribute__((section(".append")))
-void build_byte_reverse_table()
+APPEND void build_byte_reverse_table()
 {
 	extern const u8 byte_reverse_table_init[256];
 	extern u8 byte_reverse_table[256];

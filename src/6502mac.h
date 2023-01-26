@@ -10,7 +10,7 @@ C = 0x01	@6502 flags
 Z = 0x02
 I = 0x04
 D = 0x08
-B = 0x10	@(allways 1 except when IRQ pushes it)
+B_ = 0x10	@(always 1 except when IRQ pushes it)
 R = 0x20	@(locked at 1)
 V = 0x40
 N = 0x80
@@ -323,14 +323,6 @@ _ABS	= 4						@absolute
 	orr addy,addy,r1,lsl#8
 	add addy,addy,m6502_y,lsr#24
 @	bic addy,addy,#0xff0000 @Zelda2 needs this
-.endm
-
-.macro doZPI							@Zeropage indirect     ($nn)
-	_type	=      _ABS
-	ldrb r0,[m6502_pc],#1
-	ldrb addy,[r0,cpu_zpage]!
-	ldrb r1,[r0,#1]
-	orr addy,addy,r1,lsl#8
 .endm
 
 .macro doZ                             @zero page              $nn

@@ -8,7 +8,7 @@
 #define DEBUG 0				//Set to 1 to have code called at the end of each instruction (such as logging)
 
 //#define VERSION_NUMBER "X alpha 3"
-#define VERSION_NUMBER "2013-07-01"
+#define VERSION_NUMBER "2023-1-20"
 //#define VERSION_NUMBER "DO NOT RELEASE"
 
 //default options
@@ -43,7 +43,7 @@
 #define USE_GAME_SPECIFIC_HACKS 1	//Fixes Magic of Scheherazade (rearranges the banks in memory)
 #define USE_ACCELERATION 1	//Copies first 128K of ROM into EWRAM, not sure if this helps performance or not, but it does force 256 byte alignment.
 #define MULTIBOOT 0			//Allows the Link Transfer feature
-#define GOMULTIBOOT 0		//Allows use of the "Go Multiboot" feature (for multiboot builds)
+#define GOMULTIBOOT 1		//Allows use of the "Go Multiboot" feature (for multiboot builds)
 
 //Other options
 #define CHEATFINDER 1		//Enables the cheat finder
@@ -54,7 +54,8 @@
 #define MOVIEPLAYER 0		//This is a GBA Movie Player build
 #define CRASH 1				//Enables the crash detector (if it fails to complete running a frame within 5 seconds, shows a stack dump)
 #define VISOLY 1			//Include RESET code for the Flash2Advance and EZ4 cartridges
-#define ROMMENU 1
+#define ROMMENU 1			//Include the Rom Menu code (excluded for Compy to save space)
+#define MAPPER_OVERLAYS 0	//Use IWRAM overlays for mappers (saves space for Compy)
 
 #if defined COMPY
 
@@ -70,7 +71,7 @@
 #undef CRASH
 #define CRASH 0
 #undef USE_GAME_SPECIFIC_HACKS
-#define USE_GAME_SPECIFIC_HACKS 0
+#define USE_GAME_SPECIFIC_HACKS 1
 #undef RTCSUPPORT
 #define RTCSUPPORT 0
 #undef LESSMAPPERS
@@ -83,6 +84,11 @@
 #define EDITFOLLOW 0
 #undef ROMMENU
 #define ROMMENU 0
+#undef MAPPER_OVERLAYS
+#define MAPPER_OVERLAYS 1
+#undef VERSION_IN_ROM
+#define VERSION_IN_ROM 0
+
 
 #elif defined GBAMP
 

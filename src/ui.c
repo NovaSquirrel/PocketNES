@@ -74,10 +74,11 @@ const fptr multifnlist[]=
 	#if OLDSPEEDHACKS
 	ui4,
 	#endif
+	sleep_,
 	#if MULTIBOOT
 	multiboot,
 	#endif
-	sleep_,restart,exit_
+	restart,exit_
 };
 
 const fptr fnlist1[]=
@@ -89,13 +90,13 @@ const fptr fnlist1[]=
 	#if OLDSPEEDHACKS
 	ui4,
 	#endif
-	#if MULTIBOOT
-	multiboot,
-	#endif
 	#if SAVE
 	savestatemenu,loadstatemenu,managesram,
 	#endif
 	sleep_,
+	#if MULTIBOOT
+	multiboot,
+	#endif
 	#if GOMULTIBOOT
 	go_multiboot,
 	#endif
@@ -227,11 +228,11 @@ void drawui1()
 	#if OLDSPEEDHACKS
 	print_1_1("Speed Hacks->");
 	#endif
-	#if MULTIBOOT
-	print_1_1("Link Transfer");
-	#endif
 	if(mainmenuitems==ARRSIZE(multifnlist)) {
 		print_1_1("Sleep");
+		#if MULTIBOOT
+		print_1_1("Link Transfer");
+		#endif
 		print_1_1("Restart");
 		print_1_1("Exit");
 	} else {
@@ -241,6 +242,9 @@ void drawui1()
 		print_1_1("Manage SRAM->");
 		#endif
 		print_1_1("Sleep");
+		#if MULTIBOOT
+		print_1_1("Link Transfer");
+		#endif
 		#if GOMULTIBOOT
 		print_1_1("Go Multiboot");
 		#endif
@@ -788,7 +792,7 @@ void draw_input_text(int row, int column, char* str, int hilitedigit)
 	
 //	const int hilite=(1<<12)+0x4100,nohilite=0x4100;
 	
-	u16 *here;
+	vu16 *here;
 	row+=37;
 	row&=0x1F;
 	here=SCREENBASE+row*32+column+1;
@@ -958,9 +962,97 @@ char *number(unsigned short n)
 //extern int romnum;
 
 #if GOMULTIBOOT
-//THIS CODE HASN'T BEEN COMPILED IN FOR A WHILE AND NEEDS FIXING!
 void go_multiboot()
 {
+#if VERSION_IN_ROM
+	u8* rom_addr;
+	u32 romsize;
+	u8 *emu_src=(u8*)mb_binary;
+	u8 *emu_dest=(u8*)0x02000000;
+	u32 emu_size=(u32)mb_binary_end - (u32)mb_binary;
+	u32 max_mb_size=0x40000 - emu_size + 0x8000;
+	int i;
+	int key;
+	
+	rom_addr=(u8*)findrom(selectedrom);
+	romsize = *(u32*)(&rom_addr[32]);
+	romsize += 48;
+	if (pogoshell) romsize = pogoshell_filesize;
+	romsize =((romsize-1)|3)+1;
+	u32 romsize_truncated = romsize;
+	if (romsize + emu_size > 0x40000)
+	{
+		romsize_truncated = 0x40000 - emu_size;
+	}
+	
+	if (romsize>max_mb_size)
+	{
+		cls(1);
+		drawtext(8, "Game is too big to multiboot.",0);
+		for(i=0;i<90;i++)			//wait a while
+		{
+			waitframe();
+		}
+		return;
+	}
+	else
+	{
+		cls(1);
+		drawtext(8, "This will reset the emulator!",0);
+		drawtext(9, "       Are you sure?",0);
+		drawtext(10,"        A=YES, B=NO",0);
+		oldkey=~REG_P1;			//reset key input
+		do {
+			key=getmenuinput(10);
+			if(key&(B_BTN + R_BTN + L_BTN ))
+				return;
+		} while(!(key&(A_BTN)));
+		oldkey=~REG_P1;			//reset key input
+	}
+	REG_IME=0;
+	REG_DM0CNT_H=0;
+	REG_DM1CNT_H=0;
+	REG_DM2CNT_H=0;
+	REG_DM3CNT_H=0;
+	REG_DISPCNT = 0;
+	memset32((void*)0x06000000, 0, 0x18000);
+	if (romsize > 32768)
+	{
+		u8 *chunk = rom_addr + romsize - 0x8000;
+		memcpy32((void*)0x06000000, chunk + 0x0000, 0x2000);
+		memcpy32((void*)0x06004000, chunk + 0x2000, 0x2000);
+		memcpy32((void*)0x06014000, chunk + 0x4000, 0x4000);					
+	}
+	
+	memcpy32(emu_dest,emu_src,emu_size);
+	memcpy32(emu_dest+emu_size,rom_addr,romsize_truncated);
+	u8 *src = emu_dest+emu_size+romsize_truncated;
+	u8 *end = (u8*)0x02040000;
+	memset32(src, 0, end - src);
+	
+	__asm
+	(
+		"mov r0,#0xF6" "\n"	//Reset all except for VRAM and EWRAM
+		"swi 0x01" "\n"		//RegisterRamReset
+		"mov r0,#0x01" "\n"	//Reboot at EWRAM
+		"ldr r1,=0x03007FFA" "\n"	//Return type flag
+		"strb r0,[r1]" "\n"			//Set value
+		"swi 0x00" "\n"		//Soft Reset
+		
+		//reset IWRAM to zeroes
+		//"ldr r0,=0x03000000" "\n"
+		//"ldr r1,=0x8000" "\n"
+		//"mov r2,#0" "\n"
+		//"0:" "\n"
+		//"str r2,[r0],#4" "\n"
+		//"sub r1,#4" "\n"
+		//"bne 0b" "\n"
+		//"ldr r0,=0x02000000\n"
+		//"bx r0\n"
+		".ltorg"
+	);
+#else
+//THIS CODE HASN'T BEEN COMPILED IN FOR A WHILE AND NEEDS FIXING!
 	u8 *src, *dest;
 	int size;
 	int key;
@@ -974,7 +1066,7 @@ void go_multiboot()
 	if (rom_size>size)
 	{
 		cls(1);
-		drawtext(8, "Game is too big to multiboot",0);
+		drawtext(8, "Game is too big to multiboot.",0);
 		drawtext(9,"      Attempt anyway?",0);
 		drawtext(10,"        A=YES, B=NO",0);
 		oldkey=~REG_P1;			//reset key input
@@ -992,6 +1084,7 @@ void go_multiboot()
 	loadcart(selectedrom,emuflags&0x300,0);
 	mainmenuitems=MENUXITEMS[1];
 	roms=1;
+#endif
 }
 #endif
 
